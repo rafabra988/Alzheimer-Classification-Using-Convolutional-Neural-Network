@@ -15,6 +15,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 from PIL import Image
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import  classification_report
 
 #lendo e extraindo o arquivo archive.zip onde o dataset está localizando
 #reading and extracting the file archive.zip where the dataset is located 
@@ -55,7 +56,7 @@ MildDemented = list(data_dir.glob('MildDemented/*'))
 # img.show()
 
 # Criando datasets direto do diretório
-batch_size = 32
+batch_size = 16
 img_height = 180
 img_width = 180
 
@@ -71,6 +72,7 @@ train_ds = tf.keras.utils.image_dataset_from_directory(
     data_dir,
     validation_split=0.3,
     subset="training",
+    label_mode='int',
     seed=123,
     image_size=(img_height, img_width),
     batch_size=batch_size
@@ -80,6 +82,7 @@ val_ds = tf.keras.utils.image_dataset_from_directory(
     data_dir,
     validation_split=0.3,
     subset="validation",
+    label_mode='int',
     seed=123,
     image_size=(img_height, img_width),
     batch_size=batch_size
@@ -98,7 +101,7 @@ test_ds = tf.keras.utils.image_dataset_from_directory(
 # selected_samples_per_class = 10000 # Desired number of samples per class
 # filtered_dataset_elements = []
 
-
+print(train_ds.class_names)
 
 # Normalização dados
 #Normalizing data
@@ -114,11 +117,11 @@ early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_wei
 #defining the model
 def get_model(layer1, layer2):
     model = Sequential([
-        layers.Conv2D(16, 3, padding='same', input_shape=(180, 180, 3), activation='relu'),
+        layers.Conv2D(64, 3, padding='same', input_shape=(180, 180, 3), activation='relu'), #16 filtros, kernel 3x3, padding same (same = com padding / valid = sem padding), funcao de ativacao relu
+        layers.MaxPooling2D(), #pooling padrao de 2x2 | usando para selecionar o maior valor dentro da regiao 2x2 em um mapa criado pela camada conv2d
+        layers.Conv2D(128, 3, padding='same', activation='relu'),
         layers.MaxPooling2D(),
-        layers.Conv2D(32, 3, padding='same', activation='relu'),
-        layers.MaxPooling2D(),
-        layers.Conv2D(64, 3, padding='same', activation='relu'),
+        layers.Conv2D(256, 3, padding='same', activation='relu'),
         layers.MaxPooling2D(),
         layers.Flatten(),
         layers.Dense(layer1, activation='relu'),
@@ -142,7 +145,7 @@ def get_model(layer1, layer2):
 with tf.device('/GPU:0'):
     #instanciando o modelo
     #instantiating the model
-    gpu_model = get_model(layer1=128, layer2=64)
+    gpu_model = get_model(layer1=256, layer2=256)
     # model.fit(X_train_fold, y_train_fold, epochs=50, batch_size=10,
     #                     validation_data=(X_val_fold, y_val_fold),
     #                     class_weight=class_weights_dict, callbacks=[early_stopping], verbose=0)
@@ -158,15 +161,20 @@ with tf.device('/GPU:0'):
 y_true = np.concatenate([y for x, y in test_ds], axis=0)
 cm = tf.math.confusion_matrix(labels=y_true, predictions=y_pred.argmax(axis=1))
 
+# for i , j in cm:
+
+print(cm)
+
+classes = ['MildDemented', 'ModerateDemented',  'NonDemented', 'VeryMildDemented']
 #plotando a matriz de confusão
 #plotting the confusion matrix 
 plt.figure(figsize=(10, 7))
-sns.heatmap(cm, annot=True, fmt='d')  
+sns.heatmap(cm, annot=True, fmt='d', xticklabels=classes, yticklabels=classes)  
 plt.xlabel('Predicted')
 plt.ylabel('Truth')
 plt.show()
 
-
+print(classification_report(y_true, y_pred.argmax(axis=1), target_names=classes))
 
 
 
