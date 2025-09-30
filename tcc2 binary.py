@@ -141,7 +141,7 @@ def get_model(layer1, layer2):
         layers.Dropout(0.5),
         layers.Dense(layer2, activation='relu'),
         layers.Dropout(0.5),
-        layers.Dense(4 , activation='softmax'),
+        layers.Dense(2 , activation='softmax'),
         
     ])
 
