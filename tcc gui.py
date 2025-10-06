@@ -10,7 +10,7 @@ from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt
 
 # --- Carregue seu modelo aqui ---
-# Certifique-se de que o caminho 'saved_model/gpu_model.keras' está correto
+# Certificar de que o caminho 'saved_model/gpu_model.keras' está correto
 try:
     gpu_model = tf.keras.models.load_model('saved_model/gpu_model.keras')
     MODEL_LOADED = True
