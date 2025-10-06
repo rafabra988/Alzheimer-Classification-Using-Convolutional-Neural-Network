@@ -111,18 +111,28 @@ val_ds = val_ds.map(lambda x, y: (normalization_layer(x), y))
 test_ds = test_ds.map(lambda x, y: (normalization_layer(x), y))
 
 
-early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=1)
+early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True, verbose=1)
 
 #definindo o modelo
 #defining the model
 def get_model(layer1, layer2):
+    ##testa 1000 epocas com early stopping de 100
     model = Sequential([
-        layers.Conv2D(64, 3, padding='same', input_shape=(180, 180, 3), activation='relu'), #16 filtros, kernel 3x3, padding same (same = com padding / valid = sem padding), funcao de ativacao relu
+        layers.RandomFlip("horizontal", input_shape=(img_height, img_width, 3)),
+        layers.RandomRotation(0.1),
+        layers.RandomZoom(0.1),
+        layers.Conv2D(16, 3, padding='same', activation='relu'), #16 filtros, kernel 3x3, padding same (same = com padding / valid = sem padding), funcao de ativacao relu
         layers.MaxPooling2D(), #pooling padrao de 2x2 | usando para selecionar o maior valor dentro da regiao 2x2 em um mapa criado pela camada conv2d
-        layers.Conv2D(128, 3, padding='same', activation='relu'),
+        layers.Conv2D(32, 3, padding='same', activation='relu'),
         layers.MaxPooling2D(),
-        layers.Conv2D(256, 3, padding='same', activation='relu'),
+        layers.Conv2D(64, 3, padding='same', activation='relu'),
         layers.MaxPooling2D(),
+        # layers.Conv2D(128, 3, padding='same', activation='relu'),
+        # layers.MaxPooling2D(),
+        # layers.Conv2D(256, 3, padding='same', activation='relu'),
+        # layers.MaxPooling2D(),
+        # layers.Conv2D(512, 3, padding='same', activation='relu'),
+        # layers.MaxPooling2D(),
         layers.Flatten(),
         layers.Dense(layer1, activation='relu'),
         layers.Dropout(0.5),
@@ -134,7 +144,7 @@ def get_model(layer1, layer2):
 
 
     model.compile(optimizer='adam',
-                loss=tf.keras.losses.SparseCategoricalCrossentropy,
+                loss='sparse_categorical_crossentropy',
                 metrics=['accuracy']
     )
     
@@ -151,7 +161,7 @@ with tf.device('/GPU:0'):
     #                     class_weight=class_weights_dict, callbacks=[early_stopping], verbose=0)
     #treinando o modelo
     #training the model
-    gpu_model.fit(train_ds, validation_data=val_ds, epochs=50, callbacks=[early_stopping])
+    history = gpu_model.fit(train_ds, validation_data=val_ds, epochs=1000, callbacks=[early_stopping])
     #avaliando o modelo
     #evaluating the model
     y_pred = gpu_model.predict(test_ds)
@@ -167,17 +177,63 @@ print(cm)
 
 classes = ['MildDemented', 'ModerateDemented',  'NonDemented', 'VeryMildDemented']
 #plotando a matriz de confusão
-#plotting the confusion matrix 
+#plotting confusion matrix 
 plt.figure(figsize=(10, 7))
 sns.heatmap(cm, annot=True, fmt='d', xticklabels=classes, yticklabels=classes)  
 plt.xlabel('Predicted')
 plt.ylabel('Truth')
+plt.title('Confusion Matrix')   
+plt.show()
+
+plt.figure(figsize=(10, 7))
+plt.plot(history.history['loss'], label = 'train')
+plt.plot(history.history['val_loss'], label = 'test')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend()
+plt.show()
+
+fig, (ax1, ax2, ax3, ax4) = plt.subplots(4)
+
+fig.set_size_inches(18.5, 10.5)
+
+# Plot loss
+ax1.set_title('Loss')
+ax1.plot(history.history['loss'], label = 'train')
+ax1.plot(history.history['val_loss'], label = 'test')
+ax1.set_ylabel('Loss')
+
+# Determine upper bound of y-axis
+max_loss = max(history.history['loss'] + history.history['val_loss'])
+
+ax1.set_ylim([0, np.ceil(max_loss)])
+ax1.set_xlabel('Epoch')
+ax1.legend(['Train', 'Validation']) 
+
+# Plot accuracy
+ax2.set_title('Accuracy')
+ax2.plot(history.history['accuracy'],  label = 'train')
+ax2.plot(history.history['val_accuracy'], label = 'validation')
+ax2.set_ylabel('Accuracy')
+ax2.set_ylim([0, 1])
+ax2.set_xlabel('Epoch')
+ax2.legend(['Train', 'Validation'])
+
+sns.heatmap(cm, annot=True, fmt='d', xticklabels=classes, yticklabels=classes, ax=ax3)  
+ax3.set_xlabel('Predicted')
+ax3.set_ylabel('Truth')
+ax3.set_title('Confusion Matrix')   
 plt.show()
 
 print(classification_report(y_true, y_pred.argmax(axis=1), target_names=classes))
 
 
+check = input("would you like to save this model? if so, then type yes, if you don't, then type no\n")
 
+
+if check.lower() == 'yes': 
+    with tf.device('/CPU:0'):
+        gpu_model.save("saved_model/gpu_model.keras")
 
 
 
